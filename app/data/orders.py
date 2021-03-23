@@ -20,7 +20,7 @@ class Order(SqlAlchemyBase):
 
     @validates('order_id')
     def validate_id(self, key, value):
-        if not isinstance(value, int):
+        if not isinstance(value, int) or value < 0:
             raise ValueError(f"Invalid id {value}, id must be an integer")
         return value
 
@@ -33,7 +33,7 @@ class Order(SqlAlchemyBase):
 
     @validates('region')
     def validate_region(self, key, value):
-        if not isinstance(value, int):
+        if (not isinstance(value, int)) or value <= 0:
             raise ValueError(
                 f"Invalid region {value}, region must be an integer")
         return value
@@ -44,6 +44,6 @@ class Order(SqlAlchemyBase):
             start, end = time.split('-')
             start = datetime.strptime(start, '%H:%M')
             end = datetime.strptime(end, '%H:%M')
-            if not start < end:
-                ValueError("Incorrect time format")
+            if start > end:
+                raise ValueError("Incorrect time format")
         return dumps(value)

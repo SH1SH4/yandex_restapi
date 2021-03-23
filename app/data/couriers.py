@@ -19,7 +19,7 @@ class Courier(SqlAlchemyBase):
 
     @validates('courier_id')
     def validate_id(self, key, value):
-        if not isinstance(value, int):
+        if (not isinstance(value, int)) or value < 0:
             raise ValueError(f"Invalid id {value}, id must be an integer")
         return value
 
@@ -34,7 +34,7 @@ class Courier(SqlAlchemyBase):
         if not isinstance(value, list):
             raise ValueError(f"Regions must be list type")
         for region in value:
-            if not isinstance(region, int):
+            if (not isinstance(region, int)) or region <= 0:
                 raise ValueError(f"Invalid region {region}, region must be an integer")
         return dumps(value)
 
@@ -71,7 +71,7 @@ class Courier(SqlAlchemyBase):
 
     def check_order_time(self, order):
         for order_time in loads(order.delivery_hours):
-            order_start = order_time.split('-')[0]
+            order_start, order_end = order_time.split('-')
             # Преобразуем в экземпляр datetime
             order_start = datetime.strptime(order_start, '%H:%M')
 
@@ -85,7 +85,8 @@ class Courier(SqlAlchemyBase):
                 # Проверка вхождения начала времени получения в промежуток
                 # времени доставки, если входит, то
                 # прерываем цикл и принимаем заказ
-                if courier_start <= order_start < courier_end:
+                if courier_start <= order_start < courier_end or\
+                    order_start <= courier_start < courier_end:
                     return True  # Если входит - возвращаем True
             return False  # Если True не вернули - возвращаем False
 
@@ -109,4 +110,4 @@ class Courier(SqlAlchemyBase):
                     td.append(min(differences))
             t = min(td)
             rating = (60 * 60 - min(t, 60 * 60)) / (60 * 60) * 5
-            data['rating'] = rating
+            data['rating'] = round(rating, 2)

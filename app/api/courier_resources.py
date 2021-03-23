@@ -15,17 +15,6 @@ class CouriersResource(Resource):
         data = json_validator()
         if type(data) == Response:
             return data
-        try:
-            data = data['data']
-        except KeyError:
-            response = app.response_class(
-                status=400,
-                response={
-                    "error_description": "Invalid data format"
-                },
-                mimetype='application/json'
-            )
-            return response
 
         db_sess = db_session.create_session()
         not_validate_couriers = list()
@@ -38,6 +27,7 @@ class CouriersResource(Resource):
         validate = list()
         #  Блок проверки данных
         try:
+            data = data['data']
             for current in data:  # Перебор полученных значений
                 cour_id = current['courier_id']
                 if db_sess.query(Courier).get(cour_id):
@@ -52,6 +42,16 @@ class CouriersResource(Resource):
                 'error_description': str(e)
             }
             not_validate_couriers.append(validate_error)
+
+        except KeyError:
+            response = app.response_class(
+                status=400,
+                response=dumps({
+                    "error_description": "Invalid data format"
+                }),
+                mimetype='application/json'
+            )
+            return response
 
         except TypeError as e:
             response = app.response_class(
@@ -122,10 +122,7 @@ class CouriersListResource(Resource):
 
         except AssertionError:
             db_sess.close()
-            response = app.response_class(
-                status=400,
-                response=dumps({'error_description': 'Invalid courier ID'}),
-                mimetype='application/json')
+            response = app.response_class(status=404)
             return response
 
 
@@ -144,15 +141,13 @@ class CourierInfo(Resource):
             elif cour_type == 'car':
                 earnings *= 9
             data = {
-                {
                     "courier_id": courier_id,
                     "courier_type": cour_type,
                     "regions": loads(courier.regions),
                     "working_hours": loads(courier.working_hours),
                     "earnings": earnings
                 }
-            }
-            courier.get_rating()
+            courier.get_rating(data)
             response = app.response_class(
                 status=200,
                 response=dumps(data),
@@ -160,4 +155,4 @@ class CourierInfo(Resource):
             )
             return response
         except AssertionError:
-            return Response(404)
+            return app.response_class(status=404)

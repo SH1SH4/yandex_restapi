@@ -30,9 +30,10 @@ class OrdersResources(Resource):
         validate = list()  # Список провалидированных id
 
         try:
-            for current in data:  # Перебор полученных значений
+            for current in data['data']:  # Перебор полученных значений
                 if db_sess.query(Order).get(current['order_id']):
-                    raise ValueError(f"id{current['order_id']} is already in the database")
+                    raise ValueError(
+                        f"id{current['order_id']} is already in the database")
                 order = Order(**current)
                 db_sess.add(order)
                 validate.append(current['order_id'])
@@ -43,6 +44,16 @@ class OrdersResources(Resource):
                 'error_description': str(e)
             }
             not_validate_orders.append(validate_error)
+
+        except KeyError:
+            response = app.response_class(
+                status=400,
+                response=dumps({
+                    "error_description": "Invalid data format"
+                }),
+                mimetype='application/json'
+            )
+            return response
 
         except TypeError as e:
             response = app.response_class(
@@ -81,33 +92,37 @@ class OrdersAssign(Resource):
         if type(data) == Response:
             return data
 
-        if 'courier_id' not in data:
-            return Response(status=404)
+        if 'courier_id' not in data or\
+                not isinstance(data['courier_id'], int):
+            return app.response_class(status=400)
         db_sess = db_session.create_session()
         courier_id = data['courier_id']
         courier = db_sess.query(Courier).get(courier_id)
 
         if courier:  # Проверяем, есть ли у нас курьер с таким id
             orders = db_sess.query(Order).filter(
-                Order.deliver == courier.courier_id,
-                not Order.complete,
+                Order.complete == False,
+                Order.deliver == courier_id
             ).all()  # Вытаскиваем с БД все невыполненные заказы этого курьера
-
+            for i in orders:
+                print(i.order_id)
             if orders:
-                # Если они есть - собираем их id в словарь и время получения для ответа
+                # Если они есть - собираем их id в словарь
+                # и время получения для ответа
                 orders_list = [{'id': i.order_id} for i in orders]
                 assigned_time = orders[0].assign_time
 
             else:
-                # Если их нет - вытаскиваем с БД все подходящие заказы без назначеного курьера
+                # Если их нет - вытаскиваем с БД все подходящие заказы
+                # без назначеного курьера
                 orders = db_sess.query(Order).filter(
-                    Order.deliver is None,
+                    Order.deliver == None,
                     Order.region.in_(loads(courier.regions)),
                 )
                 # Сразу проверяем не назначен ли заказ на другого курьера
                 # и соовтетствие регионам
                 orders_list = list()
-                assigned_time = datetime.now().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+                assigned_time = datetime.now().strftime(TIME_FORMAT)
 
                 for order in orders:  # Перебираем заказы
                     # Получаем начало удобного промежутка получения
@@ -118,6 +133,7 @@ class OrdersAssign(Resource):
                         orders_list.append({'id': order.order_id})
 
                 db_sess.commit()
+                db_sess.close()
 
             if orders_list:
                 response_data = {
@@ -132,11 +148,10 @@ class OrdersAssign(Resource):
                 status=200,
                 mimetype='application/json'
             )
-            db_sess.close()
             return response
         else:  # Иначе ошибка
             db_sess.close()
-            return Response(status=400)
+            return app.response_class(status=400)
 
 
 class OrderComplete(Resource):
@@ -173,7 +188,8 @@ class OrderComplete(Resource):
                 mimetype='application/json')
 
         try:  # Проверка формата времени
-            complete_time = datetime.strptime(data["complete_time"], TIME_FORMAT)
+            datetime.strptime(data["complete_time"], TIME_FORMAT)
+            complete_time = data["complete_time"]
         except Exception as e:
             db_sess.close()
             return app.response_class(
@@ -200,11 +216,10 @@ class OrderComplete(Resource):
                     str(complete_time)]
 
             order.complete = True
-            order.complete_time = complete_time
+            order.complete_time = datetime.strptime(complete_time, TIME_FORMAT)
             courier.completed_orders += 1
             courier.delivered_time = dumps(time)
             db_sess.commit()
-            db_sess.close()
 
         response = app.response_class(
             status=200,
