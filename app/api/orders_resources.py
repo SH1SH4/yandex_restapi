@@ -16,6 +16,7 @@ class OrdersResources(Resource):
         try:
             data = loads(request.get_data())
             assert isinstance(data, dict)
+            data = data['data']
         except Exception:
             response = Flask.response_class(
                 status=400,
@@ -35,8 +36,8 @@ class OrdersResources(Resource):
 
         validate = list()  # Список провалидированных id
 
-        try:
-            for current in data['data']:  # Перебор полученных значений
+        for current in data:  # Перебор полученных значений
+            try:
                 if db_sess.query(Order).get(current['order_id']):
                     raise ValueError(
                         f"id{current['order_id']} is already in the database")
@@ -44,30 +45,29 @@ class OrdersResources(Resource):
                 db_sess.add(order)
                 validate.append(current['order_id'])
 
-        except ValueError as e:
-            validate_error = {
-                'id': current['order_id'],
-                'error_description': str(e)
-            }
-            not_validate_orders.append(validate_error)
+            except KeyError as e:
+                response = app.response_class(
+                    status=400,
+                    response=dumps(
+                        {"error_description": "invalid data format"}),
+                    mimetype='application/json')
+                db_sess.close()
+                return response
 
-        except KeyError:
-            response = app.response_class(
-                status=400,
-                response=dumps({
-                    "error_description": "Invalid data format"
-                }),
-                mimetype='application/json'
-            )
-            return response
+            except ValueError as e:
+                validate_error = {
+                    'id': current['order_id'],
+                    'error_description': str(e)
+                }
+                not_validate_orders.append(validate_error)
 
-        except TypeError as e:
-            response = app.response_class(
-                status=400,
-                response=dumps({"error_description": str(e)}),
-                mimetype='application/json')
-            db_sess.close()
-            return response
+            except TypeError as e:
+                response = app.response_class(
+                    status=400,
+                    response=dumps({"error_description": str(e)}),
+                    mimetype='application/json')
+                db_sess.close()
+                return response
 
         if not_validate_orders:
             # Если в непровалидированном списке есть значение

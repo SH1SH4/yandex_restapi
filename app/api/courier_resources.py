@@ -22,54 +22,55 @@ class CouriersResource(Resource):
         try:
             data = loads(request.get_data())
             assert isinstance(data, dict)
-            #  Блок проверки данных
             data = data['data']
-            for current in data:  # Перебор полученных значений
+        except KeyError:
+            response = Flask.response_class(
+                status=400,
+                response=dumps({"error_description": "Invalid data format"}),
+                mimetype='application/json')
+            return response
+
+        except Exception:
+            response = Flask.response_class(
+                status=400,
+                response=dumps({"error_description": "Invalid JSON"}),
+                mimetype='application/json')
+            return response
+        #  Блок проверки данных
+        for current in data:  # Перебор полученных значений
+            try:
                 cour_id = current['courier_id']
                 if db_sess.query(Courier).get(cour_id):
-                    raise ValueError(f'id{cour_id} is already in the database')
+                    raise ValueError(
+                        f'id{cour_id} is already in the database')
                 courier = Courier(**current)
                 db_sess.add(courier)
                 validate.append(cour_id)
 
-        except ValueError as e:
-            validate_error = {
-                'id': current['courier_id'],
-                'error_description': str(e)
-            }
-            not_validate_couriers.append(validate_error)
+            except ValueError as e:
+                validate_error = {
+                    'id': current['courier_id'],
+                    'error_description': str(e)
+                }
+                not_validate_couriers.append(validate_error)
 
-        except JSONDecodeError:
-            response = Flask.response_class(
-                status=400,
-                response=dumps({"error_description": "Invalid JSON"}),
-                mimetype='application/json')
-            return response
+            except KeyError:
+                response = app.response_class(
+                    status=400,
+                    response=dumps({
+                        "error_description": "Invalid data format"
+                    }),
+                    mimetype='application/json'
+                )
+                return response
 
-        except AssertionError:
-            response = Flask.response_class(
-                status=400,
-                response=dumps({"error_description": "Invalid JSON"}),
-                mimetype='application/json')
-            return response
-
-        except KeyError:
-            response = app.response_class(
-                status=400,
-                response=dumps({
-                    "error_description": "Invalid data format"
-                }),
-                mimetype='application/json'
-            )
-            return response
-
-        except TypeError as e:
-            response = app.response_class(
-                status=400,
-                response=dumps({"error_description": str(e)}),
-                mimetype='application/json')
-            db_sess.close()
-            return response
+            except TypeError as e:
+                response = app.response_class(
+                    status=400,
+                    response=dumps({"error_description": str(e)}),
+                    mimetype='application/json')
+                db_sess.close()
+                return response
 
         # Если непровалидировался id возвращаем их список
         if not_validate_couriers:
@@ -107,7 +108,6 @@ class CouriersListResource(Resource):
                 mimetype='application/json')
             return response
 
-
         try:
             # Если не нашли курьера - выкидываем ошибку
             if not courier:
@@ -117,7 +117,7 @@ class CouriersListResource(Resource):
             orders = db_sess.query(Order).filter(Order.deliver == courier_id,
                                                  not Order.complete).all()
             for order in orders:
-                if not courier.check_order_time(order) or\
+                if not courier.check_order_time(order) or \
                         order.region not in loads(courier.regions):
                     order.deliver = None
                     order.assign_time = None
@@ -147,12 +147,12 @@ class CourierInfo(Resource):
             courier = db_sess.query(Courier).get(courier_id)
             assert courier
             data = {
-                    "courier_id": courier_id,
-                    "courier_type": courier.courier_type,
-                    "regions": loads(courier.regions),
-                    "working_hours": loads(courier.working_hours),
-                    "earnings": courier.earnings
-                }
+                "courier_id": courier_id,
+                "courier_type": courier.courier_type,
+                "regions": loads(courier.regions),
+                "working_hours": loads(courier.working_hours),
+                "earnings": courier.earnings
+            }
             # Считаем рейтинг
             if courier.completed_orders > 0:
                 td = list()
