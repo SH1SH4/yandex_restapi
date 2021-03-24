@@ -14,7 +14,7 @@ class Order(SqlAlchemyBase):
     delivery_hours = Column(String, nullable=False)
     deliver = Column(String, nullable=True)
     complete = Column(Boolean, nullable=True, default=False)
-    assign_time = Column(String, nullable=True)
+    assign_time = Column(DateTime, nullable=True)
     complete_time = Column(DateTime, nullable=True)
     keys = ("order_id", "weight", "region", "delivery_hours")
 

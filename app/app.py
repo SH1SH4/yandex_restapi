@@ -10,7 +10,7 @@ api = Api(app)
 
 def main():
     db_session.global_init('db/delivery.db')
-    app.run(host='127.0.0.1', port=5000)
+    app.run(host='127.0.0.1', port=5000, threaded=True)
 
 
 api.add_resource(CouriersResource, '/couriers')

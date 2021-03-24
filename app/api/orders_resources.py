@@ -1,21 +1,27 @@
 from flask_restful import Resource
-from flask import Flask, Response
+from flask import Flask, request
 from json import loads, dumps
-from modules.functions import json_validator
-from modules.globals import TIME_FORMAT
 from data import db_session
 from data.orders import Order
 from data.couriers import Courier
 from datetime import datetime
+
+TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 
 app = Flask(__name__)
 
 
 class OrdersResources(Resource):
     def post(self):
-        data = json_validator()
-        if type(data) == Response:
-            return data
+        try:
+            data = loads(request.get_data())
+            assert isinstance(data, dict)
+        except Exception:
+            response = Flask.response_class(
+                status=400,
+                response=dumps({"error_description": "Invalid JSON"}),
+                mimetype='application/json')
+            return response
 
         db_sess = db_session.create_session()
 
@@ -88,9 +94,16 @@ class OrdersResources(Resource):
 
 class OrdersAssign(Resource):
     def post(self):
-        data = json_validator()
-        if type(data) == Response:
-            return data
+
+        try:
+            data = loads(request.get_data())
+            assert isinstance(data, dict)
+        except Exception:
+            response = Flask.response_class(
+                status=400,
+                response=dumps({"error_description": "Invalid JSON"}),
+                mimetype='application/json')
+            return response
 
         if 'courier_id' not in data or\
                 not isinstance(data['courier_id'], int):
@@ -104,8 +117,6 @@ class OrdersAssign(Resource):
                 Order.complete == False,
                 Order.deliver == courier_id
             ).all()  # Вытаскиваем с БД все невыполненные заказы этого курьера
-            for i in orders:
-                print(i.order_id)
             if orders:
                 # Если они есть - собираем их id в словарь
                 # и время получения для ответа
@@ -122,7 +133,7 @@ class OrdersAssign(Resource):
                 # Сразу проверяем не назначен ли заказ на другого курьера
                 # и соовтетствие регионам
                 orders_list = list()
-                assigned_time = datetime.now().strftime(TIME_FORMAT)
+                assigned_time = datetime.now()
 
                 for order in orders:  # Перебираем заказы
                     # Получаем начало удобного промежутка получения
@@ -138,7 +149,8 @@ class OrdersAssign(Resource):
             if orders_list:
                 response_data = {
                     'orders': orders_list,
-                    'assigned_time': assigned_time
+                    'assigned_time': datetime.strftime(assigned_time,
+                                                       TIME_FORMAT)
                 }
             else:
                 response_data = {'orders': orders_list}
@@ -158,9 +170,15 @@ class OrderComplete(Resource):
     def post(self):
         db_sess = db_session.create_session()
 
-        data = json_validator()
-        if type(data) == Response:
-            return data
+        try:
+            data = loads(request.get_data())
+            assert isinstance(data, dict)
+        except Exception:
+            response = Flask.response_class(
+                status=400,
+                response=dumps({"error_description": "Invalid JSON"}),
+                mimetype='application/json')
+            return response
 
         if 'courier_id' not in data:
             db_sess.close()
@@ -197,29 +215,19 @@ class OrderComplete(Resource):
                 response=dumps({"error_description": str(e)}),
                 mimetype='application/json')
 
-        time = courier.delivered_time
-        if not order.complete:
-            # Если заказ не выполнен - пропускаем запись в БД
-            if time:  # Если в доставках есть записи - загружаем их
-                time = loads(time)
-
-            else:  # Если в доставках ещё нет записей - создаём словарь
-                time = dict()
-
-            if order.region in time:
-                # Если записи по региону есть - добавляем в них время
-                time[order.region].append(str(complete_time))
-
-            else:  # Если их нет - создаём
-                time[order.region] = [
-                    order.assign_time,
-                    str(complete_time)]
-
-            order.complete = True
-            order.complete_time = datetime.strptime(complete_time, TIME_FORMAT)
-            courier.completed_orders += 1
-            courier.delivered_time = dumps(time)
-            db_sess.commit()
+        order.complete = True
+        order.complete_time = datetime.strptime(complete_time, TIME_FORMAT)
+        courier.completed_orders += 1
+        earn = 500
+        cour_type = courier.courier_type
+        if cour_type == 'foot':
+            earn *= 2
+        elif cour_type == 'bike':
+            earn *= 5
+        elif cour_type == 'car':
+            earn *= 9
+        courier.earnings += earn
+        db_sess.commit()
 
         response = app.response_class(
             status=200,

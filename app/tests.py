@@ -2,14 +2,13 @@ from data import db_session
 from datetime import datetime, timedelta
 import pytest
 import os
-from modules.globals import TIME_FORMAT
 from json import dumps
 from app import app
 
-
+TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 # creating db
 try:
-    os.remove('test.db')
+    os.remove('db/test.db')
 except:
     pass
 db_session.global_init('db/test.db')
@@ -34,6 +33,7 @@ def test_post_courier(client):
             }]
     })
     rv = client.post('/couriers', data=js)
+    print(rv.get_json())
     assert rv.status_code == 201
     assert rv.data == b'{"couriers": [{"id": 0}]}'
 
@@ -49,6 +49,7 @@ def test_post_courier_id_already_in_db(client):
             }]
     })
     rv = client.post('/couriers', data=js)
+    print(rv.get_json())
     assert rv.status_code == 400
     assert rv.get_json() == {"validation_error":
         {"couriers": [
@@ -71,6 +72,7 @@ def test_post_courier_id_error(client):
             }]
     })
     rv = client.post('/couriers', data=js)
+    print(rv.get_json())
     assert rv.status_code == 400
     assert rv.get_json() == {"validation_error": {"couriers": [
         {"id": 0.1,
@@ -91,6 +93,7 @@ def test_post_courier_region_error(client):
             }]
     })
     rv = client.post('/couriers', data=js)
+    print(rv.get_json())
     assert rv.status_code == 400
     assert rv.get_json() == {"validation_error": {"couriers": [
         {"id": 1, "error_description": "Regions must be list type"}]}}
@@ -105,6 +108,7 @@ def test_post_courier_region_error(client):
             }]
     })
     rv = client.post('/couriers', data=js)
+    print(rv.get_json())
     assert rv.status_code == 400
     assert rv.get_json() == {"validation_error": {"couriers": [
         {"id": 1,
@@ -123,6 +127,7 @@ def test_post_courier_type_error(client):
             }]
     })
     rv = client.post('/couriers', data=js)
+    print(rv.get_json())
     assert rv.status_code == 400
     assert rv.get_json() == {"validation_error": {
         "couriers": [{"id": 2, "error_description": "Invalid courier type"}]}}
@@ -139,6 +144,7 @@ def test_post_courier_time_error(client):
             }]
     })
     rv = client.post('/couriers', data=js)
+    print(rv.get_json())
     assert rv.status_code == 400
     assert rv.get_json() == {'validation_error':
         {'couriers': [
@@ -156,6 +162,7 @@ def test_post_courier_time_error(client):
             }]
     })
     rv = client.post('/couriers', data=js)
+    print(rv.get_json())
     assert rv.status_code == 400
     assert rv.get_json() == {"validation_error":
         {"couriers": [
@@ -172,6 +179,7 @@ def test_post_courier_time_error(client):
             }]
     })
     rv = client.post('/couriers', data=js)
+    print(rv.get_json())
     assert rv.status_code == 400
     assert rv.get_json() == {'validation_error':
         {'couriers': [
@@ -195,6 +203,8 @@ def test_post_courier_invalid_json(client):
     assert rv.get_json() == {'error_description':
                                  'Invalid data format'}
 
+
+def test_post_courier_extra_key_json(client):
     js = dumps({
         "data":
             [{
@@ -206,14 +216,18 @@ def test_post_courier_invalid_json(client):
             }]
     })
     rv = client.post('/couriers', data=js)
+    print(rv.get_json())
     assert rv.status_code == 400
     assert rv.get_json() == {
         "error_description":
             "'extra_key' is an invalid keyword argument for Courier"
     }
 
+
+def test_post_courier_json_not_dict(client):
     js = dumps('Invalid Json')
     rv = client.post('/couriers', data=js)
+    print(rv.get_json())
     assert rv.status_code == 400
     assert rv.get_json() == {'error_description': 'Invalid JSON'}
 
@@ -225,6 +239,7 @@ def test_patch_courier(client):
         "working_hours": ["08:00-22:00"]
     })
     rv = client.patch('/couriers/0', data=js)
+    print(rv.get_json())
     assert rv.status_code == 201
     assert rv.get_json() == {'courier_id': 0,
                              'courier_type': 'car',
@@ -238,6 +253,7 @@ def test_patch_courier_unknown_key(client):
         "working_hours": ["08:00-22:00"]
     })
     rv = client.patch('/couriers/0', data=js)
+    print(rv.get_json())
     assert rv.status_code == 400
     assert rv.get_json() == {'error_description': 'Unknown key in data'}
 
@@ -245,8 +261,13 @@ def test_patch_courier_unknown_key(client):
 def test_patch_courier_empty_data(client):
     js = dumps({})
     rv = client.patch('/couriers/0', data=js)
-    assert rv.status_code == 400
-    assert rv.get_json() == {'error_description': 'Invalid JSON'}
+    print(rv.get_json())
+    assert rv.status_code == 201
+    assert rv.get_json() == {'courier_id': 0,
+                             'courier_type': 'car',
+                             'regions': [1],
+                             'working_hours': ['08:00-22:00']
+                             }
 
 
 def test_patch_courier_unknown_courier(client):
@@ -255,7 +276,9 @@ def test_patch_courier_unknown_courier(client):
         "working_hours": ["08:00-22:00"]
     })
     rv = client.patch('/couriers/101', data=js)
-    assert rv.status_code == 404
+    print(rv.get_json())
+    assert rv.status_code == 400
+    assert rv.get_json() == {'error_description': 'Invalid courier_id'}
 
 
 def test_patch_string_courier_id(client):
@@ -264,6 +287,7 @@ def test_patch_string_courier_id(client):
         "working_hours": ["08:00-22:00"]
     })
     rv = client.patch('/couriers/courier', data=js)
+    print(rv.get_json())
     assert rv.status_code == 404
 
 
@@ -287,15 +311,14 @@ def test_post_orders(client):
             "delivery_hours": ["09:00-18:00"]
         }]})
     rv = client.post('/orders', data=js)
-    print(rv.data)
+    print(rv.get_json())
     assert rv.status_code == 201
 
 
 def test_post_orders_invalid_id(client):
-    id = 1.5
     js = {"data": [
         {
-            "order_id": id,
+            "order_id": 1.5,
             "weight": 0.23,
             "region": 12,
             "delivery_hours": ["09:00-18:00"]
@@ -305,9 +328,9 @@ def test_post_orders_invalid_id(client):
     assert rv.status_code == 400
     assert rv.get_json() == {'validation_error':
         {'orders': [
-                    {'error_description':
-                        'Invalid id 1.5, id must be an integer',
-                     'id': 1.5}]}}
+            {'error_description':
+                 'Invalid id 1.5, id must be an integer',
+             'id': 1.5}]}}
 
     js['data'][0]['order_id'] = -1
     rv = client.post('/orders', data=dumps(js))
@@ -315,9 +338,9 @@ def test_post_orders_invalid_id(client):
     assert rv.status_code == 400
     assert rv.get_json() == {'validation_error':
         {'orders': [
-                    {'error_description':
-                        'Invalid id -1, id must be an integer',
-                     'id': -1}]}}
+            {'error_description':
+                 'Invalid id -1, id must be an integer',
+             'id': -1}]}}
 
 
 def test_post_orders_id_already_in_db(client):
@@ -329,9 +352,13 @@ def test_post_orders_id_already_in_db(client):
             "delivery_hours": ["09:00-18:00"]
         }]})
     rv = client.post('/orders', data=js)
+    print(rv.get_json())
     assert rv.status_code == 400
-    assert rv.get_json() == {'validation_error': {'orders':
-        [{'error_description': 'id0 is already in the database', 'id': 0}]}}
+    assert rv.get_json() == {'validation_error':
+        {'orders': [{
+            'id': 0,
+            'error_description':
+                'id0 is already in the database'}]}}
 
 
 def test_post_orders_bad_weight(client):
@@ -343,12 +370,12 @@ def test_post_orders_bad_weight(client):
             "delivery_hours": ["09:00-18:00"]
         }]})
     rv = client.post('/orders', data=js)
-    print(rv.data)
+    print(rv.get_json())
     assert rv.status_code == 400
     assert rv.get_json() == {"validation_error": {"orders": [
-                                {"id": 1,
-                                 "error_description":
-                                    "Allowed weight from 0.01 kg to 50kg"}]}}
+        {"id": 1,
+         "error_description":
+             "Allowed weight from 0.01 kg to 50kg"}]}}
 
     js = dumps({"data": [
         {
@@ -358,12 +385,12 @@ def test_post_orders_bad_weight(client):
             "delivery_hours": ["09:00-18:00"]
         }]})
     rv = client.post('/orders', data=js)
-    print(rv.data)
+    print(rv.get_json())
     assert rv.status_code == 400
     assert rv.get_json() == {"validation_error": {"orders": [
-                                {"id": 1,
-                                 "error_description":
-                                    "Allowed weight from 0.01 kg to 50kg"}]}}
+        {"id": 1,
+         "error_description":
+             "Allowed weight from 0.01 kg to 50kg"}]}}
 
 
 def test_post_orders_bad_region(client):
@@ -375,13 +402,13 @@ def test_post_orders_bad_region(client):
             "delivery_hours": ["09:00-18:00"]
         }]})
     rv = client.post('/orders', data=js)
-    print(rv.data)
+    print(rv.get_json())
     assert rv.status_code == 400
     assert rv.get_json() == {'validation_error':
-        {'orders':
-             [{'id': 2,
-               'error_description':
-                 'Invalid region -12, region must be an integer'}]}}
+                                 {'orders':
+                                      [{'id': 2,
+                                        'error_description':
+                                            'Invalid region -12, region must be an integer'}]}}
 
 
 def test_post_orders_string_in_time(client):
@@ -400,7 +427,7 @@ def test_post_orders_string_in_time(client):
             'id': 2,
             'error_description':
                 "time data 'morning' does not match format '%H:%M'"}
-                   ]
+        ]
         }
     }
 
@@ -430,6 +457,7 @@ def test_post_orders_bad_time(client):
 def test_orders_assign(client):
     js = dumps({'courier_id': 0})
     rv = client.post('/orders/assign', data=js)
+    print(rv.get_json())
     assert rv.status_code == 200
     collected_id = rv.get_json()['orders'][0]['id']
     assert collected_id == 0
@@ -438,19 +466,21 @@ def test_orders_assign(client):
 def test_orders_assign_empty_data(client):
     js = dumps({})
     rv = client.post('/orders/assign', data=js)
+    print(rv.get_json())
     assert rv.status_code == 400
-    assert rv.get_json() == {'error_description': 'Invalid JSON'}
 
 
 def test_orders_assign_invalid_data(client):
     js = dumps({'focus': 'json crashed'})
     rv = client.post('/orders/assign', data=js)
+    print(rv.get_json())
     assert rv.status_code == 400
 
 
 def test_orders_assign_invalid_courier(client):
     js = dumps({'courier_id': 'invalid'})
     rv = client.post('/orders/assign', data=js)
+    print(rv.get_json())
     assert rv.status_code == 400
 
 
@@ -463,6 +493,7 @@ def test_orders_complete(client):
         "complete_time": time.strftime(TIME_FORMAT)
     })
     rv = client.post('/orders/complete', data=js)
+    print(rv.get_json())
     assert rv.status_code == 200
     assert rv.get_json() == {'order_id': 0}
 
@@ -475,6 +506,7 @@ def test_orders_complete_invalid_courier(client):
         "complete_time": time.strftime(TIME_FORMAT)
     })
     rv = client.post('/orders/complete', data=js)
+    print(rv.get_json())
     assert rv.status_code == 400
 
 
@@ -486,6 +518,7 @@ def test_orders_complete_invalid_order(client):
         "complete_time": time.strftime(TIME_FORMAT)
     })
     rv = client.post('/orders/complete', data=js)
+    print(rv.get_json())
     assert rv.status_code == 400
 
 
@@ -496,6 +529,7 @@ def test_orders_complete_invalid_time(client):
         "complete_time": 'вчера'
     })
     rv = client.post('/orders/complete', data=js)
+    print(rv.get_json())
     assert rv.status_code == 400
 
     js = dumps({
@@ -504,6 +538,7 @@ def test_orders_complete_invalid_time(client):
         "complete_time": '10:30'
     })
     rv = client.post('/orders/complete', data=js)
+    print(rv.get_json())
     assert rv.status_code == 400
 
 
@@ -531,4 +566,292 @@ def test_courier_info_invalid_id(client):
     assert rv.status_code == 404
 
 
+# Полный тест основных функций
+
+# Добавляем курьеров
+def test_full_post_couriers(client):
+    rv = client.post("/couriers", data=dumps({
+        "data": [
+            {
+                "courier_id": 1,
+                "courier_type": "foot",
+                "regions": [5, 6],
+                "working_hours": ["11:35-14:05", "09:00-11:00"]
+            },
+            {
+                "courier_id": 2,
+                "courier_type": "foot",
+                "regions": [4, 8, 3],
+                "working_hours": ["07:00-10:00"]
+            },
+            {
+                "courier_id": 3,
+                "courier_type": "foot",
+                "regions": [1, 5],
+                "working_hours": ["14:00-16:35", "16:50-18:00"]
+            },
+            {
+                "courier_id": 4,
+                "courier_type": "foot",
+                "regions": [7],
+                "working_hours": ["14:00-16:35", "16:50-18:00"]
+            }
+        ]
+    }))
+    assert rv.status_code == 201
+
+
+# Добавляем заказы
+def test_full_post_orders(client):
+    rv = client.post("/orders", data=dumps({
+        "data": [
+            {
+                "order_id": 1,
+                "weight": 0.23,
+                "region": 5,
+                "delivery_hours": ["08:00-10:00"]
+            },
+            {
+                "order_id": 2,
+                "weight": 15,
+                "region": 5,
+                "delivery_hours": ["14:00-18:00"]
+            },
+            {
+                "order_id": 3,
+                "weight": 0.01,
+                "region": 4,
+                "delivery_hours": ["09:00-12:00", "16:00-21:30"]
+            },
+            {
+                "order_id": 4,
+                "weight": 0.23,
+                "region": 6,
+                "delivery_hours": ["09:00-18:00"]
+            },
+            {
+                "order_id": 5,
+                "weight": 15,
+                "region": 1,
+                "delivery_hours": ["09:00-18:00"]
+            },
+            {
+                "order_id": 6,
+                "weight": 0.01,
+                "region": 5,
+                "delivery_hours": ["16:00-21:30"]
+            },
+            {
+                "order_id": 7,
+                "weight": 0.23,
+                "region": 5,
+                "delivery_hours": ["09:00-18:00"]
+            },
+            {
+                "order_id": 8,
+                "weight": 15,
+                "region": 1,
+                "delivery_hours": ["09:00-18:00"]
+            },
+            {
+                "order_id": 9,
+                "weight": 0.01,
+                "region": 4,
+                "delivery_hours": ["09:00-12:00", "16:00-21:30"]
+            },
+            {
+                "order_id": 10,
+                "weight": 15,
+                "region": 2,
+                "delivery_hours": ["08:00-10:00"]
+            }
+        ]
+    }))
+
+    assert rv.status_code == 201
+
+
+# Принимаем заказы
+def test_full_orders_assign(client):
+    rv = client.post('/orders/assign', data=dumps({"courier_id": 1}))
+    assert rv.status_code == 200
+    assert rv.get_json()['orders'] == [
+        {'id': 1}, {'id': 2}, {'id': 4}, {'id': 7}
+    ]
+
+    rv = client.post('/orders/assign', data=dumps({"courier_id": 2}))
+    assert rv.status_code == 200
+    assert rv.get_json()['orders'] == [
+        {'id': 3}, {'id': 9}
+    ]
+
+    rv = client.post('/orders/assign', data=dumps({"courier_id": 3}))
+    assert rv.status_code == 200
+    assert rv.get_json()['orders'] == [
+        {'id': 5}, {'id': 6}, {'id': 8}
+    ]
+
+    rv = client.post('/orders/assign', data=dumps({"courier_id": 4}))
+    assert rv.status_code == 200
+    assert rv.get_json()['orders'] == []
+
+
+# Выполнение заказов 1ого курьера
+def test_full_courier1_complete_orders(client):
+    rv = client.post('orders/complete', data=dumps(
+        {
+            "courier_id": 1,
+            "order_id": 1,
+            "complete_time": (
+                    datetime.now() + timedelta(minutes=30)
+            ).strftime(TIME_FORMAT)
+        }))
+    assert rv.status_code == 200
+    assert rv.get_json() == {"order_id": 1}
+
+    rv = client.post('orders/complete', data=dumps({
+        "courier_id": 1,
+        "order_id": 2,
+        "complete_time": (
+                datetime.now() + timedelta(minutes=50)
+        ).strftime(TIME_FORMAT)
+    }))
+    assert rv.status_code == 200
+    assert rv.get_json() == {"order_id": 2}
+
+    rv = client.post('orders/complete', data=dumps({
+        "courier_id": 1,
+        "order_id": 4,
+        "complete_time": (
+                datetime.now() + timedelta(minutes=25)
+        ).strftime(TIME_FORMAT)
+    }))
+    assert rv.status_code == 200
+    assert rv.get_json() == {"order_id": 4}
+
+    rv = client.post('orders/complete', data=dumps({
+        "courier_id": 1,
+        "order_id": 7,
+        "complete_time": (
+                datetime.now() + timedelta(minutes=7)
+        ).strftime(TIME_FORMAT)
+    }))
+    assert rv.status_code == 200
+    assert rv.get_json() == {"order_id": 7}
+
+
+# Выполнение заказов 2ого курьера
+def test_full_courier2_complete_orders(client):
+    rv = client.post('orders/complete', data=dumps(
+        {
+            "courier_id": 2,
+            "order_id": 3,
+            "complete_time": (
+                    datetime.now() + timedelta(minutes=15)
+            ).strftime(TIME_FORMAT)
+        }))
+    assert rv.status_code == 200
+    assert rv.get_json() == {"order_id": 3}
+
+    rv = client.post('orders/complete', data=dumps({
+        "courier_id": 2,
+        "order_id": 9,
+        "complete_time": (
+                datetime.now() + timedelta(minutes=25)
+        ).strftime(TIME_FORMAT)
+    }))
+    assert rv.status_code == 200
+    assert rv.get_json() == {"order_id": 9}
+
+
+# Выполнение заказов 3го курьера
+def test_full_courier3_complete_orders(client):
+    rv = client.post('orders/complete', data=dumps(
+        {
+            "courier_id": 3,
+            "order_id": 5,
+            "complete_time": (
+                    datetime.now() + timedelta(minutes=30)
+            ).strftime(TIME_FORMAT)
+        }))
+    print(rv.get_json)
+    assert rv.status_code == 200
+    assert rv.get_json() == {"order_id": 5}
+
+    rv = client.post('orders/complete', data=dumps({
+        "courier_id": 3,
+        "order_id": 6,
+        "complete_time": (
+                datetime.now() + timedelta(minutes=50)
+        ).strftime(TIME_FORMAT)
+    }))
+    assert rv.status_code == 200
+    print(rv.get_json())
+    assert rv.get_json() == {"order_id": 6}
+
+    # Проверяем убрались ли 2 верхних заказа из активных
+    rv = client.post('orders/assign', data=dumps({'courier_id': 3}))
+    assert rv.get_json()['orders'][0]['id'] == 8
+    assert len(rv.get_json()['orders']) == 1
+
+    rv = client.post('orders/complete', data=dumps({
+        "courier_id": 3,
+        "order_id": 8,
+        "complete_time": (
+                datetime.now() + timedelta(minutes=25)
+        ).strftime(TIME_FORMAT)
+    }))
+    assert rv.status_code == 200
+    assert rv.get_json() == {"order_id": 8}
+
+# Получение информации 1ого курьера
+def test_full_get_courier1_info(client):
+    rv = client.get('couriers/1')
+    assert rv.get_json() == {
+        'courier_id': 1,
+        'courier_type': 'foot',
+        'regions': [5, 6],
+        'working_hours': ['11:35-14:05', '09:00-11:00'],
+        'earnings': 4000,
+        'rating': 3.61
+    }
+
+
+# Получение информации 2ого курьера
+def test_full_get_courier2_info(client):
+    rv = client.get('couriers/2')
+    assert rv.get_json() == {
+        'courier_id': 2,
+        'courier_type': 'foot',
+        'regions': [4, 8, 3],
+        'working_hours': ['07:00-10:00'],
+        'earnings': 2000,
+        'rating': 3.96
+    }
+
+
+# Получение информации 3ого курьера
+def test_full_get_courier3_info(client):
+    rv = client.get('couriers/3')
+    assert rv.get_json() == {
+        'courier_id': 3,
+        'courier_type': 'foot',
+        'regions': [1, 5],
+        'working_hours': ['14:00-16:35', '16:50-18:00'],
+        'earnings': 3000,
+        'rating': 3.75
+    }
+
+
+# Получение информации 4ого курьера
+def test_full_get_courier4_info(client):
+    rv = client.get('couriers/4')
+    print(rv.get_json())
+    assert rv.get_json() == {
+        'courier_id': 4,
+        'courier_type': 'foot',
+        'regions': [7],
+        'working_hours': ['14:00-16:35', '16:50-18:00'],
+        'earnings': 0
+    }
 

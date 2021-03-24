@@ -1,21 +1,15 @@
-from flask_restful import Resource
-from flask import Flask, Response
-from json import loads, dumps
-from modules.functions import json_validator
+from flask_restful import Resource, request
+from flask import Flask
+from json import loads, dumps, JSONDecodeError
 from data import db_session
 from data.couriers import Courier
 from data.orders import Order
-from datetime import datetime
 
 app = Flask(__name__)
 
 
 class CouriersResource(Resource):
     def post(self):
-        data = json_validator()
-        if type(data) == Response:
-            return data
-
         db_sess = db_session.create_session()
         not_validate_couriers = list()
         unvalidate = {
@@ -25,8 +19,10 @@ class CouriersResource(Resource):
         }  # Словарь для преобразования в json для ответа
 
         validate = list()
-        #  Блок проверки данных
         try:
+            data = loads(request.get_data())
+            assert isinstance(data, dict)
+            #  Блок проверки данных
             data = data['data']
             for current in data:  # Перебор полученных значений
                 cour_id = current['courier_id']
@@ -42,6 +38,20 @@ class CouriersResource(Resource):
                 'error_description': str(e)
             }
             not_validate_couriers.append(validate_error)
+
+        except JSONDecodeError:
+            response = Flask.response_class(
+                status=400,
+                response=dumps({"error_description": "Invalid JSON"}),
+                mimetype='application/json')
+            return response
+
+        except AssertionError:
+            response = Flask.response_class(
+                status=400,
+                response=dumps({"error_description": "Invalid JSON"}),
+                mimetype='application/json')
+            return response
 
         except KeyError:
             response = app.response_class(
@@ -86,13 +96,22 @@ class CouriersResource(Resource):
 class CouriersListResource(Resource):
     def patch(self, courier_id):
         db_sess = db_session.create_session()
-        data = json_validator()
-        if type(data) == Response:
-            return data
         courier = db_sess.query(Courier).get(courier_id)
+        try:
+            data = loads(request.get_data())
+            assert isinstance(data, dict)
+        except Exception:
+            response = Flask.response_class(
+                status=400,
+                response=dumps({"error_description": "Invalid JSON"}),
+                mimetype='application/json')
+            return response
+
 
         try:
-            assert courier  # Если не нашли курьера - выкидываем ошибку
+            # Если не нашли курьера - выкидываем ошибку
+            if not courier:
+                raise ValueError('Invalid courier_id')
             courier.update(**data)
             # Блок для проверки доступности заказа с новыми данными
             orders = db_sess.query(Order).filter(Order.deliver == courier_id,
@@ -120,11 +139,6 @@ class CouriersListResource(Resource):
             db_sess.close()
             return response
 
-        except AssertionError:
-            db_sess.close()
-            response = app.response_class(status=404)
-            return response
-
 
 class CourierInfo(Resource):
     def get(self, courier_id):
@@ -132,22 +146,37 @@ class CourierInfo(Resource):
             db_sess = db_session.create_session()
             courier = db_sess.query(Courier).get(courier_id)
             assert courier
-            earnings = courier.completed_orders * 500
-            cour_type = courier.courier_type
-            if cour_type == 'foot':
-                earnings *= 2
-            elif cour_type == 'bike':
-                earnings *= 5
-            elif cour_type == 'car':
-                earnings *= 9
             data = {
                     "courier_id": courier_id,
-                    "courier_type": cour_type,
+                    "courier_type": courier.courier_type,
                     "regions": loads(courier.regions),
                     "working_hours": loads(courier.working_hours),
-                    "earnings": earnings
+                    "earnings": courier.earnings
                 }
-            courier.get_rating(data)
+            # Считаем рейтинг
+            if courier.completed_orders > 0:
+                td = list()
+                for region in loads(courier.regions):
+                    orders = db_sess.query(Order).filter(
+                        Order.deliver == courier_id,
+                        Order.region == region,
+                        Order.complete == True,
+                    ).order_by(Order.complete_time).all()
+                    if orders:
+                        times = [orders[0].assign_time]
+                        for i in orders:
+                            times.append(i.complete_time)
+                        differences = list()
+                        for i in range(len(times) - 1):
+                            last_order = times[i]
+                            now_order = times[i + 1]
+                            diff = (now_order - last_order)
+                            differences.append(diff.total_seconds())
+                        average = sum(differences) / len(differences)
+                        td.append(average)
+                t = min(td)
+                rating = (60 * 60 - min(t, 60 * 60)) / (60 * 60) * 5
+                data['rating'] = round(rating, 2)
             response = app.response_class(
                 status=200,
                 response=dumps(data),

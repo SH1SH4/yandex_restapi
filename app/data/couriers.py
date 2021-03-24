@@ -2,7 +2,6 @@ from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import validates
 from datetime import datetime
 from json import loads, dumps
-from modules.globals import TIME_FORMAT
 from .db_session import SqlAlchemyBase
 
 
@@ -13,8 +12,8 @@ class Courier(SqlAlchemyBase):
     courier_type = Column(String, nullable=False)
     regions = Column(String, nullable=False)
     working_hours = Column(String, nullable=False)
-    delivered_time = Column(String, nullable=True)
     completed_orders = Column(Integer, default=0)
+    earnings = Column(Integer, default=0)
     keys = ('courier_id', 'courier_type', 'regions', 'working_hours')
 
     @validates('courier_id')
@@ -89,25 +88,3 @@ class Courier(SqlAlchemyBase):
                     order_start <= courier_start < courier_end:
                     return True  # Если входит - возвращаем True
             return False  # Если True не вернули - возвращаем False
-
-    def get_rating(self, data):
-        if self.completed_orders:
-            td = list()
-            del_time = loads(self.delivered_time)
-            # Рассчёт среднего времени доставки по региону
-            for region_time in list(del_time.values()):
-                # Если по региону нет доставок - скип
-                if region_time:
-                    differences = list()
-                    # В цикле перебираем все значения - 1
-                    for i in range(len(region_time) - 1):
-                        last_order = region_time[i]
-                        now_order = region_time[i + 1]
-                        last_order = datetime.strptime(last_order, TIME_FORMAT)
-                        now_order = datetime.strptime(now_order, TIME_FORMAT)
-                        diff = (now_order - last_order)
-                        differences.append(diff.total_seconds())
-                    td.append(min(differences))
-            t = min(td)
-            rating = (60 * 60 - min(t, 60 * 60)) / (60 * 60) * 5
-            data['rating'] = round(rating, 2)
