@@ -53,6 +53,7 @@ class CouriersResource(Resource):
                     'error_description': str(e)
                 }
                 not_validate_couriers.append(validate_error)
+                print(not_validate_couriers)
 
             except KeyError:
                 response = app.response_class(
