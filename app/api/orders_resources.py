@@ -1,6 +1,8 @@
 from flask_restful import Resource
 from flask import Flask, request
 from json import loads, dumps
+from jsonschema import validate, ValidationError
+from .schemas import POST_ORDER_SCHEMA
 from data import db_session
 from data.orders import Order
 from data.couriers import Courier
@@ -34,18 +36,31 @@ class OrdersResources(Resource):
             }
         }
 
-        validate = list()  # Список провалидированных id
-
+        valid = list()  # Список провалидированных id
+        print(data)
         for current in data:  # Перебор полученных значений
             try:
+                validate(
+                    instance=current,
+                    schema=POST_ORDER_SCHEMA
+                )
                 if db_sess.query(Order).get(current['order_id']):
                     raise ValueError(
                         f"id{current['order_id']} is already in the database")
                 order = Order(**current)
                 db_sess.add(order)
-                validate.append(current['order_id'])
+                valid.append(current['order_id'])
 
-            except KeyError as e:
+            except ValidationError as e:
+                response = app.response_class(
+                    status=400,
+                    response=dumps(
+                        {"error_description": e.message}),
+                    mimetype='application/json')
+                db_sess.close()
+                return response
+
+            except KeyError:
                 response = app.response_class(
                     status=400,
                     response=dumps(
@@ -83,7 +98,7 @@ class OrdersResources(Resource):
         db_sess.commit()
         response = app.response_class(
             response=dumps(
-                {'orders': [{'id': i} for i in validate]}
+                {'orders': [{'id': i} for i in valid]}
             ),
             status=201,
             mimetype='application/json'
@@ -94,12 +109,11 @@ class OrdersResources(Resource):
 
 class OrdersAssign(Resource):
     def post(self):
-
         try:
             data = loads(request.get_data())
             assert isinstance(data, dict)
         except Exception:
-            response = Flask.response_class(
+            response = app.response_class(
                 status=400,
                 response=dumps({"error_description": "Invalid JSON"}),
                 mimetype='application/json')

@@ -23,17 +23,19 @@ def client():
 
 # Tests post couriers
 def test_post_courier(client):
-    js = dumps({
+    js = {
         "data":
             [{
                 "courier_id": 0,
-                "regions": [1],
-                "courier_type": 'foot',
+                "regions": [1, 100],
+                "courier_type": "foot",
                 "working_hours": ["12:00-18:00"]
             }]
-    })
-    rv = client.post('/couriers', data=js)
+    }
+    rv = client.post('/couriers', data=dumps(js))
     print(rv.get_json())
+    print(rv)
+    print(rv.status_code)
     assert rv.status_code == 201
     assert rv.data == b'{"couriers": [{"id": 0}]}'
 
@@ -44,7 +46,7 @@ def test_post_courier_id_already_in_db(client):
             [{
                 "courier_id": 0,
                 "regions": [1],
-                "courier_type": 'foot',
+                "courier_type": "foot",
                 "working_hours": ["12:00-18:00"]
             }]
     })
@@ -74,12 +76,11 @@ def test_post_courier_id_error(client):
     rv = client.post('/couriers', data=js)
     print(rv.get_json())
     assert rv.status_code == 400
-    assert rv.get_json() == {"validation_error": {"couriers": [
-        {"id": 0.1,
-         "error_description": "Invalid id 0.1, id must be an integer"}
-    ]
-    }
-    }
+    assert rv.get_json() == {'validation_error':
+                                 {'couriers':
+                                      [{'id': 0.1,
+                                        'error_description':
+                                            "0.1 is not of type 'integer'"}]}}
 
 
 def test_post_courier_region_error(client):
@@ -95,8 +96,11 @@ def test_post_courier_region_error(client):
     rv = client.post('/couriers', data=js)
     print(rv.get_json())
     assert rv.status_code == 400
-    assert rv.get_json() == {"validation_error": {"couriers": [
-        {"id": 1, "error_description": "Regions must be list type"}]}}
+    assert rv.get_json() == {'validation_error':
+        {'couriers': [
+            {'id': 1,
+             'error_description':
+                 "1 is not of type 'array'"}]}}
 
     js = dumps({
         "data":
@@ -110,10 +114,11 @@ def test_post_courier_region_error(client):
     rv = client.post('/couriers', data=js)
     print(rv.get_json())
     assert rv.status_code == 400
-    assert rv.get_json() == {"validation_error": {"couriers": [
-        {"id": 1,
-         "error_description":
-             "Invalid region 1.5, region must be an integer"}]}}
+    assert rv.get_json() == {'validation_error': {
+        'couriers': [
+            {'id': 1,
+             'error_description':
+                 "1.5 is not of type 'integer'"}]}}
 
 
 def test_post_courier_type_error(client):
@@ -129,8 +134,11 @@ def test_post_courier_type_error(client):
     rv = client.post('/couriers', data=js)
     print(rv.get_json())
     assert rv.status_code == 400
-    assert rv.get_json() == {"validation_error": {
-        "couriers": [{"id": 2, "error_description": "Invalid courier type"}]}}
+    assert rv.get_json() == {'validation_error': {
+        'couriers': [
+            {'id': 2,
+             'error_description':
+                 "'helicopter' is not one of ['foot', 'car', 'bike']"}]}}
 
 
 def test_post_courier_time_error(client):
@@ -181,10 +189,11 @@ def test_post_courier_time_error(client):
     rv = client.post('/couriers', data=js)
     print(rv.get_json())
     assert rv.status_code == 400
-    assert rv.get_json() == {'validation_error':
-        {'couriers': [
-            {'error_description': 'Working_hours must be list',
-             'id': 3}]}}
+    assert rv.get_json() == {'validation_error': {
+        'couriers': [
+            {'id': 3,
+             'error_description':
+                 "'09:00-18:00' is not of type 'array'"}]}}
 
 
 def test_post_courier_invalid_json(client):
@@ -200,8 +209,7 @@ def test_post_courier_invalid_json(client):
     rv = client.post('/couriers', data=js)
     print(rv.get_json())
     assert rv.status_code == 400
-    assert rv.get_json() == {'error_description':
-                                 'Invalid data format'}
+    assert rv.get_json() == {'error_description': 'Invalid JSON'}
 
 
 def test_post_courier_extra_key_json(client):
@@ -218,10 +226,11 @@ def test_post_courier_extra_key_json(client):
     rv = client.post('/couriers', data=js)
     print(rv.get_json())
     assert rv.status_code == 400
-    assert rv.get_json() == {
-        "error_description":
-            "'extra_key' is an invalid keyword argument for Courier"
-    }
+    assert rv.get_json() == {'validation_error': {
+        'couriers': [
+            {'id': 3,
+             'error_description':
+                 "Additional properties are not allowed ('extra_key' was unexpected)"}]}}
 
 
 def test_post_courier_json_not_dict(client):
@@ -243,7 +252,7 @@ def test_patch_courier(client):
     assert rv.status_code == 201
     assert rv.get_json() == {'courier_id': 0,
                              'courier_type': 'car',
-                             'regions': [1],
+                             'regions': [1, 100],
                              'working_hours': ['08:00-22:00']}
 
 
@@ -255,7 +264,8 @@ def test_patch_courier_unknown_key(client):
     rv = client.patch('/couriers/0', data=js)
     print(rv.get_json())
     assert rv.status_code == 400
-    assert rv.get_json() == {'error_description': 'Unknown key in data'}
+    assert rv.get_json() == {'error_description':
+                                 "Additional properties are not allowed ('key' was unexpected)"}
 
 
 def test_patch_courier_empty_data(client):
@@ -265,7 +275,7 @@ def test_patch_courier_empty_data(client):
     assert rv.status_code == 201
     assert rv.get_json() == {'courier_id': 0,
                              'courier_type': 'car',
-                             'regions': [1],
+                             'regions': [1, 100],
                              'working_hours': ['08:00-22:00']
                              }
 
@@ -298,7 +308,8 @@ def test_patch_invalid_value(client):
     rv = client.patch('/couriers/0', data=js)
     print(rv.data)
     assert rv.status_code == 400
-    assert rv.get_json() == {'error_description': 'Unknown key in data'}
+    assert rv.get_json() == {'error_description':
+                                 "Additional properties are not allowed ('key' was unexpected)"}
 
 
 #  Tests post /orders
@@ -326,21 +337,15 @@ def test_post_orders_invalid_id(client):
     rv = client.post('/orders', data=dumps(js))
     print(rv.data)
     assert rv.status_code == 400
-    assert rv.get_json() == {'validation_error':
-        {'orders': [
-            {'error_description':
-                 'Invalid id 1.5, id must be an integer',
-             'id': 1.5}]}}
+    assert rv.get_json() == {"error_description":
+                                 "1.5 is not of type 'integer'"}
 
     js['data'][0]['order_id'] = -1
     rv = client.post('/orders', data=dumps(js))
     print(rv.data)
     assert rv.status_code == 400
-    assert rv.get_json() == {'validation_error':
-        {'orders': [
-            {'error_description':
-                 'Invalid id -1, id must be an integer',
-             'id': -1}]}}
+    assert rv.get_json() == {"error_description":
+                                 "-1 is less than the minimum of 0"}
 
 
 def test_post_orders_id_already_in_db(client):
@@ -372,10 +377,8 @@ def test_post_orders_bad_weight(client):
     rv = client.post('/orders', data=js)
     print(rv.get_json())
     assert rv.status_code == 400
-    assert rv.get_json() == {"validation_error": {"orders": [
-        {"id": 1,
-         "error_description":
-             "Allowed weight from 0.01 kg to 50kg"}]}}
+    assert rv.get_json() == {'error_description':
+                                 '-100 is less than the minimum of 0.01'}
 
     js = dumps({"data": [
         {
@@ -387,10 +390,8 @@ def test_post_orders_bad_weight(client):
     rv = client.post('/orders', data=js)
     print(rv.get_json())
     assert rv.status_code == 400
-    assert rv.get_json() == {"validation_error": {"orders": [
-        {"id": 1,
-         "error_description":
-             "Allowed weight from 0.01 kg to 50kg"}]}}
+    assert rv.get_json() == {'error_description':
+                                 '500 is greater than the maximum of 50'}
 
 
 def test_post_orders_bad_region(client):
@@ -404,11 +405,8 @@ def test_post_orders_bad_region(client):
     rv = client.post('/orders', data=js)
     print(rv.get_json())
     assert rv.status_code == 400
-    assert rv.get_json() == {'validation_error':
-                                 {'orders':
-                                      [{'id': 2,
-                                        'error_description':
-                                            'Invalid region -12, region must be an integer'}]}}
+    assert rv.get_json() == {'error_description':
+                                 '-12 is less than the minimum of 0'}
 
 
 def test_post_orders_string_in_time(client):
@@ -549,7 +547,7 @@ def test_courier_info(client):
     assert rv.get_json() == {
         'courier_id': 0,
         'courier_type': 'car',
-        'regions': [1],
+        'regions': [1, 100],
         'working_hours': ['08:00-22:00'],
         'earnings': 4500,
         'rating': 2.5
@@ -804,6 +802,7 @@ def test_full_courier3_complete_orders(client):
     assert rv.status_code == 200
     assert rv.get_json() == {"order_id": 8}
 
+
 # Получение информации 1ого курьера
 def test_full_get_courier1_info(client):
     rv = client.get('couriers/1')
@@ -854,4 +853,3 @@ def test_full_get_courier4_info(client):
         'working_hours': ['14:00-16:35', '16:50-18:00'],
         'earnings': 0
     }
-
