@@ -4,3 +4,4 @@ sqlalchemy
 datetime
 pytest
 jsonschema
+gunicorn==20.1.0
