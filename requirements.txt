@@ -3,3 +3,4 @@ flask_restful
 sqlalchemy
 datetime
 pytest
+jsonschema
