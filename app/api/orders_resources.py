@@ -4,7 +4,7 @@ from json import loads, dumps
 from jsonschema import validate, ValidationError
 from .schemas import POST_ORDER_SCHEMA
 from data import db_session
-from data.orders import Order
+from data.orders import Order, DeliveryHours
 from data.couriers import Courier
 from datetime import datetime
 
@@ -40,14 +40,13 @@ class OrdersResources(Resource):
         print(data)
         for current in data:  # Перебор полученных значений
             try:
-                validate(
-                    instance=current,
-                    schema=POST_ORDER_SCHEMA
-                )
+                validate(instance=current, schema=POST_ORDER_SCHEMA)
                 if db_sess.query(Order).get(current['order_id']):
                     raise ValueError(
                         f"id{current['order_id']} is already in the database")
+                delivery_hours = current.pop('delivery_hours')
                 order = Order(**current)
+                order.add_delivery_time_to_order(delivery_hours, db_sess)
                 db_sess.add(order)
                 valid.append(current['order_id'])
 
@@ -230,8 +229,11 @@ class OrderComplete(Resource):
                 mimetype='application/json')
 
         order.complete = True
+        for i in db_sess.query(DeliveryHours).filter(
+                DeliveryHours.order_id == order.order_id
+        ):
+            order.delivery_hours.remove(i)
         order.complete_time = datetime.strptime(complete_time, TIME_FORMAT)
-        courier.completed_orders += 1
         earn = 500
         cour_type = courier.courier_type
         if cour_type == 'foot':

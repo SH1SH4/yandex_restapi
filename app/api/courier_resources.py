@@ -1,11 +1,13 @@
-from flask_restful import Resource, request
-from flask import Flask
-from .schemas import POST_COURIER_SCHEMA, PATCH_COURIER_SCHEMA
 from json import loads, dumps, JSONDecodeError
+
+from flask import Flask
+from flask_restful import Resource, request
 from jsonschema import validate, ValidationError
+
 from data import db_session
 from data.couriers import Courier
 from data.orders import Order
+from .schemas import POST_COURIER_SCHEMA, PATCH_COURIER_SCHEMA
 
 app = Flask(__name__)
 
@@ -23,6 +25,7 @@ class CouriersResource(Resource):
         valid = list()
         try:
             data = loads(request.get_data())['data']
+            assert isinstance(data, list)
         except Exception:
             response = app.response_class(
                 status=400,
@@ -38,7 +41,9 @@ class CouriersResource(Resource):
                 if db_sess.query(Courier).get(cour_id):
                     raise ValueError(
                         f'id{cour_id} is already in the database')
+                working_hours = current.pop('working_hours')
                 courier = Courier(**current)
+                courier.add_working_time_to_courier(working_hours, db_sess)
                 db_sess.add(courier)
                 valid.append(cour_id)
 
@@ -88,6 +93,7 @@ class CouriersListResource(Resource):
             validate(instance=loads(request.get_data()),
                      schema=PATCH_COURIER_SCHEMA)
             data = loads(request.get_data())
+            print(data)
             assert isinstance(data, dict)
         except ValidationError as e:
             response = Flask.response_class(
@@ -95,7 +101,7 @@ class CouriersListResource(Resource):
                 response=dumps({"error_description": e.message}),
                 mimetype='application/json')
             return response
-        except JSONDecodeError:
+        except Exception:
             response = Flask.response_class(
                 status=400,
                 response=dumps({"error_description": "Invalid JSON"}),
@@ -106,16 +112,17 @@ class CouriersListResource(Resource):
             # Если не нашли курьера - выкидываем ошибку
             if not courier:
                 raise ValueError('Invalid courier_id')
-            courier.update(**data)
+            courier.update(db_sess, **data)
             # Блок для проверки доступности заказа с новыми данными
             orders = db_sess.query(Order).filter(Order.deliver == courier_id,
-                                                 not Order.complete).all()
+                                                 Order.complete == False).all()
+            print(orders)
             for order in orders:
-                if not courier.check_order_time(order) or \
-                        order.region not in loads(courier.regions):
+                print(orders)
+                if (not courier.check_order_time(order)) or \
+                        (order.region not in loads(courier.regions)):
                     order.deliver = None
                     order.assign_time = None
-
             db_sess.commit()
             response = app.response_class(
                 response=dumps(courier.to_dict()),
@@ -140,15 +147,10 @@ class CourierInfo(Resource):
             db_sess = db_session.create_session()
             courier = db_sess.query(Courier).get(courier_id)
             assert courier
-            data = {
-                "courier_id": courier_id,
-                "courier_type": courier.courier_type,
-                "regions": loads(courier.regions),
-                "working_hours": loads(courier.working_hours),
-                "earnings": courier.earnings
-            }
+            data = courier.to_dict()
+            data['earnings'] = courier.earnings
             # Считаем рейтинг
-            if courier.completed_orders > 0:
+            if courier.earnings > 0:
                 td = list()
                 for region in loads(courier.regions):
                     orders = db_sess.query(Order).filter(

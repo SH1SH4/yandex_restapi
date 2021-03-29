@@ -22,14 +22,8 @@ POST_COURIER_SCHEMA = {
     ],
     "properties": {
         "courier_id": {
-            "$id": "#/properties/courier_id",
             "type": "integer",
             "title": "The courier_id schema",
-            "description": "An explanation about the purpose of this instance.",
-            "default": 0,
-            "examples": [
-                0
-            ]
         },
         "regions": {
             "type": "array",

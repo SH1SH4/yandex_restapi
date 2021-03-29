@@ -1,7 +1,8 @@
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, Float
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, Float, \
+    ForeignKey
 from datetime import datetime
 from json import dumps
-from sqlalchemy.orm import validates
+from sqlalchemy.orm import validates, relationship
 from .db_session import SqlAlchemyBase
 
 
@@ -11,7 +12,7 @@ class Order(SqlAlchemyBase):
     order_id = Column(Integer, primary_key=True, unique=True)
     weight = Column(Float, nullable=False)
     region = Column(Integer, nullable=False)
-    delivery_hours = Column(String, nullable=False)
+    delivery_hours = relationship("DeliveryHours")
     deliver = Column(String, nullable=True)
     complete = Column(Boolean, nullable=True, default=False)
     assign_time = Column(DateTime, nullable=True)
@@ -38,12 +39,23 @@ class Order(SqlAlchemyBase):
                 f"Invalid region {value}, region must be an integer")
         return value
 
-    @validates('delivery_hours')
-    def validate_delivery_hours(self, key, value):
-        for time in value:
+    def add_delivery_time_to_order(self, values, db_sess):
+        for time in values:
             start, end = time.split('-')
-            start = datetime.strptime(start, '%H:%M')
-            end = datetime.strptime(end, '%H:%M')
-            if start > end:
-                raise ValueError("Incorrect time format")
-        return dumps(value)
+            work_hours = {
+                'order_id': self.order_id,
+                'start': datetime.strptime(start, '%H:%M'),
+                'end': datetime.strptime(end, '%H:%M')
+            }
+            if work_hours['start'] > work_hours['end']:
+                raise ValueError('Incorrect time format')
+            deliv_hours = DeliveryHours(**work_hours)
+            db_sess.add(deliv_hours)
+
+
+class DeliveryHours(SqlAlchemyBase):
+    __tablename__ = 'delivery_hours'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    order_id = Column(Integer, ForeignKey('orders.order_id'))
+    start = Column(DateTime, nullable=False)
+    end = Column(DateTime, nullable=False)
