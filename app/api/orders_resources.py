@@ -142,6 +142,7 @@ class OrdersAssign(Resource):
                 orders = db_sess.query(Order).filter(
                     Order.deliver == None,
                     Order.region.in_(loads(courier.regions)),
+                    Order.weight <= courier.get_capacity()
                 )
                 # Сразу проверяем не назначен ли заказ на другого курьера
                 # и соовтетствие регионам
@@ -151,8 +152,9 @@ class OrdersAssign(Resource):
                 for order in orders:  # Перебираем заказы
                     # Получаем начало удобного промежутка получения
                     if courier.check_order_time(order):
-                        # Проверяем на соответствие времени
+                        # Проверяем на соответствие времени и веса
                         order.deliver = courier.courier_id
+                        order.cost = 500 * courier.coefficient[courier.courier_type]
                         order.assign_time = assigned_time
                         orders_list.append({'id': order.order_id})
 
@@ -234,15 +236,7 @@ class OrderComplete(Resource):
         ):
             order.delivery_hours.remove(i)
         order.complete_time = datetime.strptime(complete_time, TIME_FORMAT)
-        earn = 500
-        cour_type = courier.courier_type
-        if cour_type == 'foot':
-            earn *= 2
-        elif cour_type == 'bike':
-            earn *= 5
-        elif cour_type == 'car':
-            earn *= 9
-        courier.earnings += earn
+        courier.earnings += order.cost
         db_sess.commit()
 
         response = app.response_class(

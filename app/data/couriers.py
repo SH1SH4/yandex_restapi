@@ -13,7 +13,10 @@ class Courier(SqlAlchemyBase):
     regions = Column(String, nullable=False)
     working_hours = relationship("WorkingHours")
     earnings = Column(Integer, default=0)
+
     keys = ('courier_id', 'courier_type', 'regions', 'working_hours')
+    coefficient = {'foot': 2, 'bike': 5, 'car': 9}
+    capacity = {'foot': 10, 'bike': 15, 'car': 50}
 
     @validates('courier_id')
     def validate_id(self, key, value):
@@ -36,6 +39,9 @@ class Courier(SqlAlchemyBase):
                 raise ValueError(
                     f"Invalid region {region}, region must be an integer")
         return dumps(value)
+
+    def get_capacity(self):
+        return self.capacity[self.courier_type]
 
     def to_dict(self):
         data = {

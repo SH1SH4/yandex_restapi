@@ -7,10 +7,9 @@ from flask_restful import Api
 app = Flask(__name__)
 api = Api(app)
 
-db_session.global_init('db/delivery.db')
-
 def main():
     app.run(host='0.0.0.0', port=8080, threaded=True)
+    db_session.global_init('db/delivery.db')
 
 
 api.add_resource(CouriersResource, '/couriers')

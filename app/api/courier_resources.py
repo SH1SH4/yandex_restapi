@@ -116,12 +116,12 @@ class CouriersListResource(Resource):
             # Блок для проверки доступности заказа с новыми данными
             orders = db_sess.query(Order).filter(Order.deliver == courier_id,
                                                  Order.complete == False).all()
-            print(orders)
             for order in orders:
-                print(orders)
                 if (not courier.check_order_time(order)) or \
-                        (order.region not in loads(courier.regions)):
+                        (order.region not in loads(courier.regions)) or \
+                        (not order.weight <= courier.get_capacity()):
                     order.deliver = None
+                    order.cost = None
                     order.assign_time = None
             db_sess.commit()
             response = app.response_class(

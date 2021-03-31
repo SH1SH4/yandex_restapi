@@ -674,7 +674,7 @@ def test_full_orders_assign(client):
     rv = client.post('/orders/assign', data=dumps({"courier_id": 1}))
     assert rv.status_code == 200
     assert rv.get_json()['orders'] == [
-        {'id': 1}, {'id': 2}, {'id': 4}, {'id': 7}
+        {'id': 1}, {'id': 4}, {'id': 7}
     ]
 
     rv = client.post('/orders/assign', data=dumps({"courier_id": 2}))
@@ -685,8 +685,7 @@ def test_full_orders_assign(client):
 
     rv = client.post('/orders/assign', data=dumps({"courier_id": 3}))
     assert rv.status_code == 200
-    assert rv.get_json()['orders'] == [
-        {'id': 5}, {'id': 6}, {'id': 8}
+    assert rv.get_json()['orders'] == [{'id': 6}
     ]
 
     rv = client.post('/orders/assign', data=dumps({"courier_id": 4}))
@@ -706,16 +705,6 @@ def test_full_courier1_complete_orders(client):
         }))
     assert rv.status_code == 200
     assert rv.get_json() == {"order_id": 1}
-
-    rv = client.post('orders/complete', data=dumps({
-        "courier_id": 1,
-        "order_id": 2,
-        "complete_time": (
-                datetime.now() + timedelta(minutes=50)
-        ).strftime(TIME_FORMAT)
-    }))
-    assert rv.status_code == 200
-    assert rv.get_json() == {"order_id": 2}
 
     rv = client.post('orders/complete', data=dumps({
         "courier_id": 1,
@@ -764,18 +753,6 @@ def test_full_courier2_complete_orders(client):
 
 # Выполнение заказов 3го курьера
 def test_full_courier3_complete_orders(client):
-    rv = client.post('orders/complete', data=dumps(
-        {
-            "courier_id": 3,
-            "order_id": 5,
-            "complete_time": (
-                    datetime.now() + timedelta(minutes=30)
-            ).strftime(TIME_FORMAT)
-        }))
-    print(rv.get_json)
-    assert rv.status_code == 200
-    assert rv.get_json() == {"order_id": 5}
-
     rv = client.post('orders/complete', data=dumps({
         "courier_id": 3,
         "order_id": 6,
@@ -787,21 +764,6 @@ def test_full_courier3_complete_orders(client):
     print(rv.get_json())
     assert rv.get_json() == {"order_id": 6}
 
-    # Проверяем убрались ли 2 верхних заказа из активных
-    rv = client.post('orders/assign', data=dumps({'courier_id': 3}))
-    assert rv.get_json()['orders'][0]['id'] == 8
-    assert len(rv.get_json()['orders']) == 1
-
-    rv = client.post('orders/complete', data=dumps({
-        "courier_id": 3,
-        "order_id": 8,
-        "complete_time": (
-                datetime.now() + timedelta(minutes=25)
-        ).strftime(TIME_FORMAT)
-    }))
-    assert rv.status_code == 200
-    assert rv.get_json() == {"order_id": 8}
-
 
 # Получение информации 1ого курьера
 def test_full_get_courier1_info(client):
@@ -811,8 +773,8 @@ def test_full_get_courier1_info(client):
         'courier_type': 'foot',
         'regions': [5, 6],
         'working_hours': ['11:35-14:05', '09:00-11:00'],
-        'earnings': 4000,
-        'rating': 3.61
+        'earnings': 3000,
+        'rating': 3.75
     }
 
 
@@ -837,8 +799,8 @@ def test_full_get_courier3_info(client):
         'courier_type': 'foot',
         'regions': [1, 5],
         'working_hours': ['14:00-16:35', '16:50-18:00'],
-        'earnings': 3000,
-        'rating': 3.75
+        'earnings': 1000,
+        'rating': 0.83
     }
 
 
